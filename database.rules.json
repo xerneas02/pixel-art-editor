@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "pixels": {
+      ".read": true,
+      ".write": true,
+      "$key": {
+        ".validate": "newData.isString() && newData.val().matches(/^#[0-9A-Fa-f]{6}$/)"
+      }
+    },
+    "gridSize": {
+      ".read": true,
+      ".write": true,
+      ".validate": "newData.isNumber() && newData.val() >= 16 && newData.val() <= 128"
+    },
+    "users": {
+      ".read": true,
+      ".write": true,
+      "$uid": {
+        ".validate": "auth != null"
+      }
+    }
+  }
+}

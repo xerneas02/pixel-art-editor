@@ -20,11 +20,22 @@ class PixelArtEditor {
         this.pixels = {};
         this.users = new Set();
         
-        // Firebase configuration (you'll need to set up your own Firebase project)
+        // Firebase configuration - Votre vraie config Firebase
         this.firebaseConfig = {
-            // Add your Firebase config here
-            // For now, we'll use local storage for demo
+            apiKey: "AIzaSyCKHEqVEeBdkoKyeDD6mLQljyUXMFHO5IU",
+            authDomain: "pixel-art-editor-72674.firebaseapp.com",
+            databaseURL: "https://pixel-art-editor-72674-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "pixel-art-editor-72674",
+            storageBucket: "pixel-art-editor-72674.firebasestorage.app",
+            messagingSenderId: "944332376141",
+            appId: "1:944332376141:web:2cce7dc8200edf7acff404"
         };
+        
+        this.firebase = null;
+        this.database = null;
+        this.pixelsRef = null;
+        this.usersRef = null;
+        this.userRef = null;
         
         this.init();
     }
@@ -35,7 +46,7 @@ class PixelArtEditor {
         this.setupEventListeners();
         this.loadFromLocalStorage();
         this.render();
-        this.simulateUsers(); // Simulate online users for demo
+        this.initFirebase();
     }
     
     setupCanvas() {
@@ -164,7 +175,12 @@ class PixelArtEditor {
             this.pixels[key] = this.currentColor;
             this.renderPixel(coords.x, coords.y, this.currentColor);
             
-            // In a real collaborative app, you'd send this to Firebase here
+            // Envoyer à Firebase si connecté
+            if (this.pixelsRef) {
+                this.pixelsRef.child(key).set(this.currentColor);
+            }
+            
+            // Sauvegarde locale en backup
             this.saveToLocalStorage();
         }
     }
@@ -216,6 +232,12 @@ class PixelArtEditor {
     clearCanvas() {
         if (confirm('Are you sure you want to clear the canvas?')) {
             this.pixels = {};
+            
+            // Effacer sur Firebase
+            if (this.pixelsRef) {
+                this.pixelsRef.set({});
+            }
+            
             this.render();
             this.saveToLocalStorage();
             this.showNotification('Canvas cleared!');
@@ -331,6 +353,12 @@ class PixelArtEditor {
         this.gridSize = newSize;
         this.pixelSize = Math.min(512 / newSize, 16);
         this.setupCanvas();
+        
+        // Synchroniser avec Firebase
+        if (this.database) {
+            this.database.ref('gridSize').set(newSize);
+        }
+        
         this.render();
         this.showNotification(`Grid resized to ${newSize}x${newSize}!`);
     }
@@ -361,13 +389,107 @@ class PixelArtEditor {
         }
     }
     
-    simulateUsers() {
-        // Simulate online users for demo
-        let userCount = 1;
-        setInterval(() => {
-            userCount = Math.floor(Math.random() * 8) + 1;
+    // Initialisation Firebase
+    initFirebase() {
+        try {
+            // Initialiser Firebase
+            firebase.initializeApp(this.firebaseConfig);
+            this.database = firebase.database();
+            
+            // Références Firebase
+            this.pixelsRef = this.database.ref('pixels');
+            this.usersRef = this.database.ref('users');
+            this.gridSizeRef = this.database.ref('gridSize');
+            
+            // Écouter les changements de pixels
+            this.pixelsRef.on('child_added', (snapshot) => {
+                const key = snapshot.key;
+                const color = snapshot.val();
+                if (this.pixels[key] !== color) {
+                    this.pixels[key] = color;
+                    const [x, y] = key.split(',').map(Number);
+                    this.renderPixel(x, y, color);
+                }
+            });
+            
+            this.pixelsRef.on('child_changed', (snapshot) => {
+                const key = snapshot.key;
+                const color = snapshot.val();
+                this.pixels[key] = color;
+                const [x, y] = key.split(',').map(Number);
+                this.renderPixel(x, y, color);
+            });
+            
+            this.pixelsRef.on('child_removed', (snapshot) => {
+                const key = snapshot.key;
+                delete this.pixels[key];
+                const [x, y] = key.split(',').map(Number);
+                this.ctx.clearRect(x * this.pixelSize, y * this.pixelSize, this.pixelSize, this.pixelSize);
+                this.render(); // Re-render pour afficher la grille
+            });
+            
+            // Écouter les changements de taille de grille
+            this.gridSizeRef.on('value', (snapshot) => {
+                const newSize = snapshot.val();
+                if (newSize && newSize !== this.gridSize) {
+                    this.gridSize = newSize;
+                    document.getElementById('gridSize').value = newSize;
+                    this.pixelSize = Math.min(512 / newSize, 16);
+                    this.setupCanvas();
+                    this.render();
+                    this.showNotification(`Grid synchronized to ${newSize}x${newSize}!`);
+                }
+            });
+            
+            // Charger les données existantes
+            this.pixelsRef.once('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    this.pixels = data;
+                    this.render();
+                }
+            });
+            
+            // Gérer la présence utilisateur
+            this.setupUserPresence();
+            
+            this.showNotification('Connected to Firebase! 🔥', false);
+            
+        } catch (error) {
+            console.error('Firebase initialization failed:', error);
+            this.showNotification('Failed to connect to Firebase. Using local mode.', true);
+            this.simulateUsers(); // Fallback to simulated users
+        }
+    }
+    
+    setupUserPresence() {
+        // Créer une référence unique pour cet utilisateur
+        this.userRef = this.usersRef.push();
+        
+        // Marquer l'utilisateur comme connecté
+        this.userRef.set({
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            lastSeen: firebase.database.ServerValue.TIMESTAMP
+        });
+        
+        // Supprimer l'utilisateur à la déconnexion
+        this.userRef.onDisconnect().remove();
+        
+        // Écouter les changements d'utilisateurs
+        this.usersRef.on('value', (snapshot) => {
+            const users = snapshot.val();
+            const userCount = users ? Object.keys(users).length : 0;
             document.getElementById('userCount').textContent = userCount;
-        }, 10000);
+        });
+        
+        // Heartbeat pour maintenir la connexion
+        setInterval(() => {
+            if (this.userRef) {
+                this.userRef.update({
+                    lastSeen: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
+        }, 30000); // Toutes les 30 secondes
     }
     
     showNotification(message, isError = false) {
@@ -381,49 +503,18 @@ class PixelArtEditor {
             notification.remove();
         }, 3000);
     }
+    
+    // Fonction de fallback si Firebase ne fonctionne pas
+    simulateUsers() {
+        let userCount = 1;
+        setInterval(() => {
+            userCount = Math.floor(Math.random() * 8) + 1;
+            document.getElementById('userCount').textContent = userCount;
+        }, 10000);
+    }
 }
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     new PixelArtEditor();
 });
-
-// Real-time collaboration setup (Firebase example)
-// Uncomment and configure when you set up Firebase
-/*
-function initFirebase() {
-    const firebaseConfig = {
-        // Your Firebase config
-    };
-    
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-    const pixelsRef = database.ref('pixels');
-    const usersRef = database.ref('users');
-    
-    // Listen for pixel changes
-    pixelsRef.on('child_changed', (snapshot) => {
-        const key = snapshot.key;
-        const color = snapshot.val();
-        const [x, y] = key.split(',').map(Number);
-        
-        // Update local pixels and render
-        this.pixels[key] = color;
-        this.renderPixel(x, y, color);
-    });
-    
-    // Track online users
-    const userRef = usersRef.push();
-    userRef.set({
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-    });
-    
-    userRef.onDisconnect().remove();
-    
-    usersRef.on('value', (snapshot) => {
-        const users = snapshot.val();
-        const userCount = users ? Object.keys(users).length : 0;
-        document.getElementById('userCount').textContent = userCount;
-    });
-}
-*/
