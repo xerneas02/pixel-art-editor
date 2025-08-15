@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative Pixel Art Editor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 Collaborative Pixel Art Editor</h1>
+            <p>Edit pixels together in real-time using the Wplace color palette!</p>
+        </header>
+
+        <div class="controls">
+            <div class="color-palette" id="colorPalette">
+                <!-- Colors will be generated dynamically -->
+            </div>
+            <div class="tools">
+                <button id="clearBtn" class="tool-btn">🗑️ Clear Canvas</button>
+                <button id="saveBtn" class="tool-btn">💾 Save Image</button>
+                <button id="loadBtn" class="tool-btn">📂 Load Saved</button>
+                <div class="grid-size">
+                    <label for="gridSize">Grid Size:</label>
+                    <select id="gridSize">
+                        <option value="16">16x16</option>
+                        <option value="32" selected>32x32</option>
+                        <option value="64">64x64</option>
+                        <option value="128">128x128</option>
+                    </select>
+                    <button id="resizeBtn" class="tool-btn">Resize</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="pixelCanvas" width="512" height="512"></canvas>
+        </div>
+
+        <div class="info">
+            <div class="current-color">
+                <span>Current Color: </span>
+                <div id="currentColorDisplay" class="color-display"></div>
+                <span id="currentColorHex">#000000</span>
+            </div>
+            <div class="online-users">
+                <span>👥 Online: </span>
+                <span id="userCount">1</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    
+    <script src="script.js"></script>
+</body>
+</html>

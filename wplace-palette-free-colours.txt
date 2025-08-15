@@ -1,0 +1,36 @@
+;paint.net Palette File
+;Downloaded from Lospec.com/palette-list
+;Palette Name: Wplace Palette (Free Colours)
+;Description: A palette of all of the free colours available on Wplace. To be used for converting images to pixel art to paint on Wplace. This is useful for the people that have yet to unlock all the colours available on the site, as they take quite a long time to get. A majority of people will end up using this palette.
+;Colors: 31
+FF000000
+FF3c3c3c
+FF787878
+FFd2d2d2
+FFffffff
+FF600018
+FFed1c24
+FFff7f27
+FFf6aa09
+FFf9dd3b
+FFfffabc
+FF0eb968
+FF13e67b
+FF87ff5e
+FF0c816e
+FF10aea6
+FF13e1be
+FF28509e
+FF4093e4
+FF60f7f2
+FF6b50f6
+FF99b1fb
+FF780c99
+FFaa38b9
+FFe09ff9
+FFcb007a
+FFec1f80
+FFf38da9
+FF684634
+FF95682a
+FFf8b277
