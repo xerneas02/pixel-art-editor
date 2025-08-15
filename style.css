@@ -119,6 +119,22 @@ header p {
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
+.tool-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.tool-btn.active {
+    background: #ff6b6b;
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.3);
+}
+
+.tool-btn.active:hover {
+    background: #ff5252;
+}
+
 .grid-size {
     display: flex;
     align-items: center;
@@ -154,6 +170,10 @@ header p {
     image-rendering: crisp-edges;
 }
 
+#pixelCanvas.eraser-mode {
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="8" y="8" width="16" height="16" fill="rgba(255,107,107,0.8)" stroke="white" stroke-width="2"/></svg>') 16 16, auto;
+}
+
 /* Info */
 .info {
     background: white;
@@ -180,6 +200,15 @@ header p {
     border: 2px solid #ddd;
     border-radius: 6px;
     background: #000000;
+}
+
+#currentTool {
+    background: #f0f0f0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 10px;
 }
 
 .online-users {

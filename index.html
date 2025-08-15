@@ -18,7 +18,10 @@
                 <!-- Colors will be generated dynamically -->
             </div>
             <div class="tools">
+                <button id="eraserBtn" class="tool-btn">🧽 Eraser</button>
                 <button id="clearBtn" class="tool-btn">🗑️ Clear Canvas</button>
+                <button id="undoBtn" class="tool-btn">↶ Undo</button>
+                <button id="redoBtn" class="tool-btn">↷ Redo</button>
                 <button id="saveBtn" class="tool-btn">💾 Save Image</button>
                 <button id="loadBtn" class="tool-btn">📂 Load Saved</button>
                 <div class="grid-size">
@@ -40,9 +43,10 @@
 
         <div class="info">
             <div class="current-color">
-                <span>Current Color: </span>
+                <span>Current Tool: </span>
                 <div id="currentColorDisplay" class="color-display"></div>
                 <span id="currentColorHex">#000000</span>
+                <span id="currentTool">Paint</span>
             </div>
             <div class="online-users">
                 <span>👥 Online: </span>

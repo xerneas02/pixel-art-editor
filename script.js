@@ -17,8 +17,12 @@ class PixelArtEditor {
         this.pixelSize = 16;
         this.currentColor = '#000000';
         this.isDrawing = false;
+        this.isErasing = false;
         this.pixels = {};
         this.users = new Set();
+        this.history = [];
+        this.historyIndex = -1;
+        this.maxHistorySize = 50;
         
         // Firebase configuration - Votre vraie config Firebase
         this.firebaseConfig = {
@@ -45,8 +49,13 @@ class PixelArtEditor {
         this.createColorPalette();
         this.setupEventListeners();
         this.loadFromLocalStorage();
+        
+        // Initialiser l'historique avec l'état initial
+        this.saveToHistory();
+        
         this.render();
         this.initFirebase();
+        this.updateUndoRedoButtons();
     }
     
     setupCanvas() {
@@ -78,6 +87,11 @@ class PixelArtEditor {
     }
     
     selectColor(color, element) {
+        // Désactiver l'effaceur si on sélectionne une couleur
+        this.isErasing = false;
+        this.updateEraserButton();
+        this.canvas.classList.remove('eraser-mode');
+        
         // Remove active class from all color buttons
         document.querySelectorAll('.color-btn').forEach(btn => {
             btn.classList.remove('active');
@@ -89,6 +103,7 @@ class PixelArtEditor {
         this.currentColor = color;
         document.getElementById('currentColorDisplay').style.backgroundColor = color;
         document.getElementById('currentColorHex').textContent = color;
+        document.getElementById('currentTool').textContent = 'Paint';
     }
     
     setupEventListeners() {
@@ -126,7 +141,10 @@ class PixelArtEditor {
         });
         
         // Tool buttons
+        document.getElementById('eraserBtn').addEventListener('click', () => this.toggleEraser());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
+        document.getElementById('undoBtn').addEventListener('click', () => this.undo());
+        document.getElementById('redoBtn').addEventListener('click', () => this.redo());
         document.getElementById('saveBtn').addEventListener('click', () => this.saveImage());
         document.getElementById('loadBtn').addEventListener('click', () => this.loadImage());
         document.getElementById('resizeBtn').addEventListener('click', () => this.resizeGrid());
@@ -142,9 +160,31 @@ class PixelArtEditor {
                         break;
                     case 'z':
                         e.preventDefault();
-                        // Could implement undo functionality
+                        if (e.shiftKey) {
+                            this.redo();
+                        } else {
+                            this.undo();
+                        }
+                        break;
+                    case 'y':
+                        e.preventDefault();
+                        this.redo();
                         break;
                 }
+            }
+            
+            // Raccourcis sans Ctrl
+            switch(e.key) {
+                case 'e':
+                case 'E':
+                    this.toggleEraser();
+                    break;
+                case 'Escape':
+                    this.isErasing = false;
+                    this.updateEraserButton();
+                    this.canvas.classList.remove('eraser-mode');
+                    document.getElementById('currentTool').textContent = 'Paint';
+                    break;
             }
         });
     }
@@ -162,6 +202,7 @@ class PixelArtEditor {
     
     startDrawing(e) {
         this.isDrawing = true;
+        this.drawingStarted = false; // Pour l'historique
         this.draw(e);
     }
     
@@ -172,12 +213,33 @@ class PixelArtEditor {
         const key = `${coords.x},${coords.y}`;
         
         if (coords.x >= 0 && coords.x < this.gridSize && coords.y >= 0 && coords.y < this.gridSize) {
-            this.pixels[key] = this.currentColor;
-            this.renderPixel(coords.x, coords.y, this.currentColor);
+            // Sauvegarder l'état avant modification pour l'historique
+            if (!this.drawingStarted) {
+                this.saveToHistory();
+                this.drawingStarted = true;
+            }
             
-            // Envoyer à Firebase si connecté
-            if (this.pixelsRef) {
-                this.pixelsRef.child(key).set(this.currentColor);
+            if (this.isErasing) {
+                // Mode effaceur
+                if (this.pixels[key]) {
+                    delete this.pixels[key];
+                    this.ctx.clearRect(coords.x * this.pixelSize, coords.y * this.pixelSize, this.pixelSize, this.pixelSize);
+                    this.drawGrid(); // Redessiner la grille à cet endroit
+                    
+                    // Envoyer à Firebase (suppression)
+                    if (this.pixelsRef) {
+                        this.pixelsRef.child(key).remove();
+                    }
+                }
+            } else {
+                // Mode dessin normal
+                this.pixels[key] = this.currentColor;
+                this.renderPixel(coords.x, coords.y, this.currentColor);
+                
+                // Envoyer à Firebase
+                if (this.pixelsRef) {
+                    this.pixelsRef.child(key).set(this.currentColor);
+                }
             }
             
             // Sauvegarde locale en backup
@@ -187,6 +249,7 @@ class PixelArtEditor {
     
     stopDrawing() {
         this.isDrawing = false;
+        this.drawingStarted = false;
     }
     
     renderPixel(x, y, color) {
@@ -231,6 +294,7 @@ class PixelArtEditor {
     
     clearCanvas() {
         if (confirm('Are you sure you want to clear the canvas?')) {
+            this.saveToHistory(); // Sauvegarder avant effacement
             this.pixels = {};
             
             // Effacer sur Firebase
@@ -242,6 +306,94 @@ class PixelArtEditor {
             this.saveToLocalStorage();
             this.showNotification('Canvas cleared!');
         }
+    }
+    
+    // Nouvelles fonctions pour l'effaceur et l'historique
+    toggleEraser() {
+        this.isErasing = !this.isErasing;
+        this.updateEraserButton();
+        
+        if (this.isErasing) {
+            this.canvas.classList.add('eraser-mode');
+            document.getElementById('currentTool').textContent = 'Eraser';
+            document.getElementById('currentColorDisplay').style.backgroundColor = '#ff6b6b';
+            document.getElementById('currentColorHex').textContent = 'ERASER';
+        } else {
+            this.canvas.classList.remove('eraser-mode');
+            document.getElementById('currentTool').textContent = 'Paint';
+            document.getElementById('currentColorDisplay').style.backgroundColor = this.currentColor;
+            document.getElementById('currentColorHex').textContent = this.currentColor;
+        }
+    }
+    
+    updateEraserButton() {
+        const eraserBtn = document.getElementById('eraserBtn');
+        if (this.isErasing) {
+            eraserBtn.classList.add('active');
+        } else {
+            eraserBtn.classList.remove('active');
+        }
+    }
+    
+    saveToHistory() {
+        // Supprimer les états futurs si on est au milieu de l'historique
+        if (this.historyIndex < this.history.length - 1) {
+            this.history = this.history.slice(0, this.historyIndex + 1);
+        }
+        
+        // Ajouter l'état actuel
+        this.history.push(JSON.parse(JSON.stringify(this.pixels)));
+        
+        // Limiter la taille de l'historique
+        if (this.history.length > this.maxHistorySize) {
+            this.history.shift();
+        } else {
+            this.historyIndex++;
+        }
+        
+        this.updateUndoRedoButtons();
+    }
+    
+    undo() {
+        if (this.historyIndex > 0) {
+            this.historyIndex--;
+            this.pixels = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
+            this.render();
+            this.saveToLocalStorage();
+            
+            // Synchroniser avec Firebase
+            if (this.pixelsRef) {
+                this.pixelsRef.set(this.pixels);
+            }
+            
+            this.updateUndoRedoButtons();
+            this.showNotification('Undo successful!');
+        }
+    }
+    
+    redo() {
+        if (this.historyIndex < this.history.length - 1) {
+            this.historyIndex++;
+            this.pixels = JSON.parse(JSON.stringify(this.history[this.historyIndex]));
+            this.render();
+            this.saveToLocalStorage();
+            
+            // Synchroniser avec Firebase
+            if (this.pixelsRef) {
+                this.pixelsRef.set(this.pixels);
+            }
+            
+            this.updateUndoRedoButtons();
+            this.showNotification('Redo successful!');
+        }
+    }
+    
+    updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        
+        undoBtn.disabled = this.historyIndex <= 0;
+        redoBtn.disabled = this.historyIndex >= this.history.length - 1;
     }
     
     saveImage() {
@@ -482,14 +634,46 @@ class PixelArtEditor {
             document.getElementById('userCount').textContent = userCount;
         });
         
-        // Heartbeat pour maintenir la connexion
+        // Heartbeat pour maintenir la connexion et synchroniser
         setInterval(() => {
             if (this.userRef) {
                 this.userRef.update({
                     lastSeen: firebase.database.ServerValue.TIMESTAMP
                 });
             }
-        }, 30000); // Toutes les 30 secondes
+        }, 15000); // Toutes les 15 secondes pour plus de réactivité
+        
+        // Actualisation périodique pour s'assurer de la synchronisation
+        setInterval(() => {
+            if (this.pixelsRef) {
+                // Forcer une synchronisation légère
+                this.pixelsRef.once('value', (snapshot) => {
+                    const serverPixels = snapshot.val() || {};
+                    let hasChanges = false;
+                    
+                    // Vérifier s'il y a des différences
+                    for (const key in serverPixels) {
+                        if (this.pixels[key] !== serverPixels[key]) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                    
+                    for (const key in this.pixels) {
+                        if (!(key in serverPixels)) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasChanges) {
+                        console.log('Synchronizing with server...');
+                        this.pixels = serverPixels;
+                        this.render();
+                    }
+                });
+            }
+        }, 5000); // Vérification toutes les 5 secondes
     }
     
     showNotification(message, isError = false) {
