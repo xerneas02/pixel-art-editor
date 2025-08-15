@@ -2,22 +2,17 @@
   "rules": {
     "pixels": {
       ".read": true,
-      ".write": true,
-      "$key": {
-        ".validate": "newData.isString() && newData.val().matches(/^#[0-9A-Fa-f]{6}$/)"
-      }
+      ".write": true
     },
     "gridSize": {
       ".read": true,
-      ".write": true,
-      ".validate": "newData.isNumber() && newData.val() >= 16 && newData.val() <= 128"
+      ".write": true
     },
     "users": {
       ".read": true,
-      ".write": true,
-      "$uid": {
-        ".validate": "auth != null"
-      }
-    }
+      ".write": true
+    },
+    ".read": true,
+    ".write": true
   }
 }

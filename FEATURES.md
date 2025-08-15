@@ -2,7 +2,13 @@
 
 ## ✨ Nouvelles Fonctionnalités Ajoutées
 
-### 🧽 Effaceur de Pixels
+### � Bucket Fill (Pot de Peinture)
+- **Bouton Bucket** : Cliquez sur "🪣 Bucket Fill" pour activer/désactiver
+- **Raccourci** : Appuyez sur `B` pour basculer
+- **Fonctionnement** : Remplit toutes les zones connectées de la même couleur
+- **Visuel** : Curseur en forme de seau quand actif
+
+### �🧽 Effaceur de Pixels
 - **Bouton Effaceur** : Cliquez sur "🧽 Eraser" pour activer/désactiver
 - **Raccourci** : Appuyez sur `E` pour basculer
 - **Échap** : `Escape` pour revenir au mode pinceau
@@ -23,6 +29,12 @@
 
 ## 🎮 Comment Utiliser
 
+### Mode Bucket Fill
+1. **Activer** : Cliquer sur "🪣 Bucket Fill" ou appuyer sur `B`
+2. **Remplir** : Cliquer sur une zone pour la remplir avec la couleur sélectionnée
+3. **Zones connectées** : Remplit tous les pixels de même couleur qui se touchent
+4. **Désactiver** : Re-cliquer sur "🪣 Bucket Fill" ou appuyer sur `Escape`
+
 ### Mode Effaceur
 1. **Activer** : Cliquer sur "🧽 Eraser" ou appuyer sur `E`
 2. **Effacer** : Cliquer/glisser sur les pixels à supprimer
@@ -36,6 +48,7 @@
 
 ### Collaboration Améliorée
 - **Pixels** s'affichent instantanément chez tous les utilisateurs
+- **Bucket fill** synchronisé en temps réel
 - **Effacements** sont synchronisés en temps réel
 - **Undo/Redo** d'un utilisateur affecte tous les collaborateurs
 
@@ -43,8 +56,9 @@
 
 | Raccourci | Action |
 |-----------|--------|
+| `B` | Basculer Bucket Fill |
 | `E` | Basculer Effaceur |
-| `Escape` | Désactiver Effaceur |
+| `Escape` | Désactiver outils actifs |
 | `Ctrl+Z` | Annuler (Undo) |
 | `Ctrl+Shift+Z` | Refaire (Redo) |
 | `Ctrl+Y` | Refaire (Redo) |
@@ -53,7 +67,8 @@
 ## 🎨 Interface Mise à Jour
 
 ### Nouveaux Boutons
-- **🧽 Eraser** : Active/désactive l'effaceur
+- **� Bucket Fill** : Active/désactive le remplissage de zone
+- **�🧽 Eraser** : Active/désactive l'effaceur
 - **↶ Undo** : Annule la dernière action
 - **↷ Redo** : Refait l'action annulée
 
@@ -63,10 +78,17 @@
 - **Boutons** : Grisés quand indisponibles
 
 ### État des Boutons
+- **Bucket actif** : Bouton bleu
 - **Effaceur actif** : Bouton rouge
 - **Undo/Redo** : Grisés si pas d'historique disponible
 
 ## 🔧 Fonctionnement Technique
+
+### Bucket Fill
+- **Algorithme** : Flood fill 4-connecté (haut, bas, gauche, droite)
+- **Optimisé** : Utilise une pile pour éviter la récursion
+- **Limites** : Respecte les bordures de la grille
+- **Synchronisation** : Chaque pixel rempli est envoyé à Firebase
 
 ### Effaceur
 - **Supprime** les pixels du canvas et de Firebase
@@ -84,6 +106,11 @@
 - **Maintient** la connexion active toutes les 15 secondes
 
 ## 🐛 Résolution de Problèmes
+
+### Bucket Fill ne fonctionne pas
+- Vérifiez que le bouton "🪣 Bucket Fill" est bleu (actif)
+- Essayez d'appuyer sur `B` pour l'activer
+- Assurez-vous de cliquer sur une zone avec une couleur différente
 
 ### Effaceur ne fonctionne pas
 - Vérifiez que le bouton "🧽 Eraser" est rouge (actif)

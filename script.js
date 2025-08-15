@@ -18,6 +18,7 @@ class PixelArtEditor {
         this.currentColor = '#000000';
         this.isDrawing = false;
         this.isErasing = false;
+        this.isBucketMode = false;
         this.pixels = {};
         this.users = new Set();
         this.history = [];
@@ -87,10 +88,11 @@ class PixelArtEditor {
     }
     
     selectColor(color, element) {
-        // Désactiver l'effaceur si on sélectionne une couleur
+        // Désactiver les autres modes si on sélectionne une couleur
         this.isErasing = false;
-        this.updateEraserButton();
-        this.canvas.classList.remove('eraser-mode');
+        this.isBucketMode = false;
+        this.updateToolButtons();
+        this.canvas.classList.remove('eraser-mode', 'bucket-mode');
         
         // Remove active class from all color buttons
         document.querySelectorAll('.color-btn').forEach(btn => {
@@ -141,6 +143,7 @@ class PixelArtEditor {
         });
         
         // Tool buttons
+        document.getElementById('bucketBtn').addEventListener('click', () => this.toggleBucket());
         document.getElementById('eraserBtn').addEventListener('click', () => this.toggleEraser());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
         document.getElementById('undoBtn').addEventListener('click', () => this.undo());
@@ -175,14 +178,19 @@ class PixelArtEditor {
             
             // Raccourcis sans Ctrl
             switch(e.key) {
+                case 'b':
+                case 'B':
+                    this.toggleBucket();
+                    break;
                 case 'e':
                 case 'E':
                     this.toggleEraser();
                     break;
                 case 'Escape':
                     this.isErasing = false;
-                    this.updateEraserButton();
-                    this.canvas.classList.remove('eraser-mode');
+                    this.isBucketMode = false;
+                    this.updateToolButtons();
+                    this.canvas.classList.remove('eraser-mode', 'bucket-mode');
                     document.getElementById('currentTool').textContent = 'Paint';
                     break;
             }
@@ -201,13 +209,18 @@ class PixelArtEditor {
     }
     
     startDrawing(e) {
-        this.isDrawing = true;
-        this.drawingStarted = false; // Pour l'historique
-        this.draw(e);
+        if (this.isBucketMode) {
+            // Mode bucket fill - action immédiate, pas de dessin continu
+            this.bucketFill(e);
+        } else {
+            this.isDrawing = true;
+            this.drawingStarted = false; // Pour l'historique
+            this.draw(e);
+        }
     }
     
     draw(e) {
-        if (!this.isDrawing) return;
+        if (!this.isDrawing || this.isBucketMode) return;
         
         const coords = this.getCanvasCoordinates(e);
         const key = `${coords.x},${coords.y}`;
@@ -224,11 +237,12 @@ class PixelArtEditor {
                 if (this.pixels[key]) {
                     delete this.pixels[key];
                     this.ctx.clearRect(coords.x * this.pixelSize, coords.y * this.pixelSize, this.pixelSize, this.pixelSize);
-                    this.drawGrid(); // Redessiner la grille à cet endroit
+                    this.drawGridAtPosition(coords.x, coords.y);
                     
                     // Envoyer à Firebase (suppression)
                     if (this.pixelsRef) {
                         this.pixelsRef.child(key).remove();
+                        console.log(`Erasing pixel: ${key}`);
                     }
                 }
             } else {
@@ -239,6 +253,7 @@ class PixelArtEditor {
                 // Envoyer à Firebase
                 if (this.pixelsRef) {
                     this.pixelsRef.child(key).set(this.currentColor);
+                    console.log(`Drawing pixel: ${key} = ${this.currentColor}`);
                 }
             }
             
@@ -292,6 +307,27 @@ class PixelArtEditor {
         }
     }
     
+    drawGridAtPosition(x, y) {
+        this.ctx.strokeStyle = '#e0e0e0';
+        this.ctx.lineWidth = 1;
+        
+        // Redessiner les lignes de grille autour de cette position
+        this.ctx.beginPath();
+        // Ligne verticale gauche
+        this.ctx.moveTo(x * this.pixelSize, y * this.pixelSize);
+        this.ctx.lineTo(x * this.pixelSize, (y + 1) * this.pixelSize);
+        // Ligne verticale droite
+        this.ctx.moveTo((x + 1) * this.pixelSize, y * this.pixelSize);
+        this.ctx.lineTo((x + 1) * this.pixelSize, (y + 1) * this.pixelSize);
+        // Ligne horizontale haut
+        this.ctx.moveTo(x * this.pixelSize, y * this.pixelSize);
+        this.ctx.lineTo((x + 1) * this.pixelSize, y * this.pixelSize);
+        // Ligne horizontale bas
+        this.ctx.moveTo(x * this.pixelSize, (y + 1) * this.pixelSize);
+        this.ctx.lineTo((x + 1) * this.pixelSize, (y + 1) * this.pixelSize);
+        this.ctx.stroke();
+    }
+    
     clearCanvas() {
         if (confirm('Are you sure you want to clear the canvas?')) {
             this.saveToHistory(); // Sauvegarder avant effacement
@@ -309,12 +345,31 @@ class PixelArtEditor {
     }
     
     // Nouvelles fonctions pour l'effaceur et l'historique
+    toggleBucket() {
+        this.isBucketMode = !this.isBucketMode;
+        this.isErasing = false; // Désactiver l'effaceur
+        this.updateToolButtons();
+        
+        if (this.isBucketMode) {
+            this.canvas.classList.add('bucket-mode');
+            this.canvas.classList.remove('eraser-mode');
+            document.getElementById('currentTool').textContent = 'Bucket Fill';
+            document.getElementById('currentColorDisplay').style.backgroundColor = this.currentColor;
+            document.getElementById('currentColorHex').textContent = this.currentColor;
+        } else {
+            this.canvas.classList.remove('bucket-mode');
+            document.getElementById('currentTool').textContent = 'Paint';
+        }
+    }
+    
     toggleEraser() {
         this.isErasing = !this.isErasing;
-        this.updateEraserButton();
+        this.isBucketMode = false; // Désactiver le bucket
+        this.updateToolButtons();
         
         if (this.isErasing) {
             this.canvas.classList.add('eraser-mode');
+            this.canvas.classList.remove('bucket-mode');
             document.getElementById('currentTool').textContent = 'Eraser';
             document.getElementById('currentColorDisplay').style.backgroundColor = '#ff6b6b';
             document.getElementById('currentColorHex').textContent = 'ERASER';
@@ -326,13 +381,93 @@ class PixelArtEditor {
         }
     }
     
-    updateEraserButton() {
+    updateToolButtons() {
+        const bucketBtn = document.getElementById('bucketBtn');
         const eraserBtn = document.getElementById('eraserBtn');
-        if (this.isErasing) {
+        
+        // Reset all tool buttons
+        bucketBtn.classList.remove('active');
+        eraserBtn.classList.remove('active');
+        
+        // Activate current tool
+        if (this.isBucketMode) {
+            bucketBtn.classList.add('active');
+        } else if (this.isErasing) {
             eraserBtn.classList.add('active');
-        } else {
-            eraserBtn.classList.remove('active');
         }
+    }
+    
+    bucketFill(e) {
+        const coords = this.getCanvasCoordinates(e);
+        
+        if (coords.x >= 0 && coords.x < this.gridSize && coords.y >= 0 && coords.y < this.gridSize) {
+            const targetKey = `${coords.x},${coords.y}`;
+            const targetColor = this.pixels[targetKey] || null; // null pour pixels vides
+            
+            // Ne pas remplir si c'est déjà la même couleur
+            if (targetColor === this.currentColor) {
+                return;
+            }
+            
+            // Sauvegarder l'état pour l'historique
+            this.saveToHistory();
+            
+            // Effectuer le bucket fill
+            const fillPixels = this.floodFill(coords.x, coords.y, targetColor, this.currentColor);
+            
+            // Appliquer les changements et synchroniser avec Firebase
+            if (fillPixels.length > 0) {
+                fillPixels.forEach(({x, y}) => {
+                    const key = `${x},${y}`;
+                    this.pixels[key] = this.currentColor;
+                    this.renderPixel(x, y, this.currentColor);
+                    
+                    // Envoyer à Firebase
+                    if (this.pixelsRef) {
+                        this.pixelsRef.child(key).set(this.currentColor);
+                    }
+                });
+                
+                console.log(`Bucket fill: ${fillPixels.length} pixels filled with ${this.currentColor}`);
+                this.saveToLocalStorage();
+                this.showNotification(`Filled ${fillPixels.length} pixels!`);
+            }
+        }
+    }
+    
+    floodFill(startX, startY, targetColor, fillColor) {
+        const filledPixels = [];
+        const stack = [{x: startX, y: startY}];
+        const visited = new Set();
+        
+        while (stack.length > 0) {
+            const {x, y} = stack.pop();
+            const key = `${x},${y}`;
+            
+            // Vérifier les limites et si déjà visité
+            if (x < 0 || x >= this.gridSize || y < 0 || y >= this.gridSize || visited.has(key)) {
+                continue;
+            }
+            
+            const currentColor = this.pixels[key] || null;
+            
+            // Vérifier si c'est la couleur cible
+            if (currentColor !== targetColor) {
+                continue;
+            }
+            
+            // Marquer comme visité et ajouter à la liste
+            visited.add(key);
+            filledPixels.push({x, y});
+            
+            // Ajouter les pixels adjacents (4-connectés)
+            stack.push({x: x + 1, y: y});
+            stack.push({x: x - 1, y: y});
+            stack.push({x: x, y: y + 1});
+            stack.push({x: x, y: y - 1});
+        }
+        
+        return filledPixels;
     }
     
     saveToHistory() {
@@ -548,12 +683,15 @@ class PixelArtEditor {
             firebase.initializeApp(this.firebaseConfig);
             this.database = firebase.database();
             
+            // Configuration pour améliorer la synchronisation
+            this.database.goOnline();
+            
             // Références Firebase
             this.pixelsRef = this.database.ref('pixels');
             this.usersRef = this.database.ref('users');
             this.gridSizeRef = this.database.ref('gridSize');
             
-            // Écouter les changements de pixels
+            // Écouter les changements de pixels avec priorité temps réel
             this.pixelsRef.on('child_added', (snapshot) => {
                 const key = snapshot.key;
                 const color = snapshot.val();
@@ -561,23 +699,30 @@ class PixelArtEditor {
                     this.pixels[key] = color;
                     const [x, y] = key.split(',').map(Number);
                     this.renderPixel(x, y, color);
+                    console.log(`Pixel added: ${key} = ${color}`);
                 }
             });
             
             this.pixelsRef.on('child_changed', (snapshot) => {
                 const key = snapshot.key;
                 const color = snapshot.val();
-                this.pixels[key] = color;
-                const [x, y] = key.split(',').map(Number);
-                this.renderPixel(x, y, color);
+                if (this.pixels[key] !== color) {
+                    this.pixels[key] = color;
+                    const [x, y] = key.split(',').map(Number);
+                    this.renderPixel(x, y, color);
+                    console.log(`Pixel changed: ${key} = ${color}`);
+                }
             });
             
             this.pixelsRef.on('child_removed', (snapshot) => {
                 const key = snapshot.key;
-                delete this.pixels[key];
-                const [x, y] = key.split(',').map(Number);
-                this.ctx.clearRect(x * this.pixelSize, y * this.pixelSize, this.pixelSize, this.pixelSize);
-                this.render(); // Re-render pour afficher la grille
+                if (this.pixels[key]) {
+                    delete this.pixels[key];
+                    const [x, y] = key.split(',').map(Number);
+                    this.ctx.clearRect(x * this.pixelSize, y * this.pixelSize, this.pixelSize, this.pixelSize);
+                    this.drawGridAtPosition(x, y); // Redessiner la grille à cette position
+                    console.log(`Pixel removed: ${key}`);
+                }
             });
             
             // Écouter les changements de taille de grille
@@ -593,10 +738,11 @@ class PixelArtEditor {
                 }
             });
             
-            // Charger les données existantes
+            // Charger les données existantes une seule fois
             this.pixelsRef.once('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
+                    console.log('Loading existing pixels:', Object.keys(data).length);
                     this.pixels = data;
                     this.render();
                 }
@@ -605,11 +751,11 @@ class PixelArtEditor {
             // Gérer la présence utilisateur
             this.setupUserPresence();
             
-            this.showNotification('Connected to Firebase! 🔥', false);
+            this.showNotification('🔥 Connected to Firebase! Real-time collaboration active!', false);
             
         } catch (error) {
             console.error('Firebase initialization failed:', error);
-            this.showNotification('Failed to connect to Firebase. Using local mode.', true);
+            this.showNotification('❌ Failed to connect to Firebase. Using local mode.', true);
             this.simulateUsers(); // Fallback to simulated users
         }
     }
@@ -618,10 +764,15 @@ class PixelArtEditor {
         // Créer une référence unique pour cet utilisateur
         this.userRef = this.usersRef.push();
         
+        // Générer un ID utilisateur unique
+        this.userId = 'user_' + Math.random().toString(36).substr(2, 9);
+        
         // Marquer l'utilisateur comme connecté
         this.userRef.set({
+            id: this.userId,
             timestamp: firebase.database.ServerValue.TIMESTAMP,
-            lastSeen: firebase.database.ServerValue.TIMESTAMP
+            lastSeen: firebase.database.ServerValue.TIMESTAMP,
+            status: 'online'
         });
         
         // Supprimer l'utilisateur à la déconnexion
@@ -632,48 +783,31 @@ class PixelArtEditor {
             const users = snapshot.val();
             const userCount = users ? Object.keys(users).length : 0;
             document.getElementById('userCount').textContent = userCount;
+            
+            if (userCount > 1) {
+                this.showNotification(`👥 ${userCount} users online - Collaboration active!`);
+            }
         });
         
-        // Heartbeat pour maintenir la connexion et synchroniser
+        // Heartbeat amélioré pour maintenir la connexion et synchroniser
         setInterval(() => {
             if (this.userRef) {
                 this.userRef.update({
-                    lastSeen: firebase.database.ServerValue.TIMESTAMP
+                    lastSeen: firebase.database.ServerValue.TIMESTAMP,
+                    status: 'online'
                 });
             }
-        }, 15000); // Toutes les 15 secondes pour plus de réactivité
+        }, 10000); // Toutes les 10 secondes
         
-        // Actualisation périodique pour s'assurer de la synchronisation
-        setInterval(() => {
-            if (this.pixelsRef) {
-                // Forcer une synchronisation légère
-                this.pixelsRef.once('value', (snapshot) => {
-                    const serverPixels = snapshot.val() || {};
-                    let hasChanges = false;
-                    
-                    // Vérifier s'il y a des différences
-                    for (const key in serverPixels) {
-                        if (this.pixels[key] !== serverPixels[key]) {
-                            hasChanges = true;
-                            break;
-                        }
-                    }
-                    
-                    for (const key in this.pixels) {
-                        if (!(key in serverPixels)) {
-                            hasChanges = true;
-                            break;
-                        }
-                    }
-                    
-                    if (hasChanges) {
-                        console.log('Synchronizing with server...');
-                        this.pixels = serverPixels;
-                        this.render();
-                    }
-                });
+        // Test de connectivité Firebase
+        this.database.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === true) {
+                console.log('✅ Connected to Firebase');
+            } else {
+                console.log('❌ Disconnected from Firebase');
+                this.showNotification('Connection lost. Trying to reconnect...', true);
             }
-        }, 5000); // Vérification toutes les 5 secondes
+        });
     }
     
     showNotification(message, isError = false) {
